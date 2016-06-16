@@ -10,11 +10,24 @@ class MyProgressPrinter(RemoteProgress):
     def update(self, op_code, cur_count, max_count=None, message=''):
         print(op_code, cur_count, max_count, cur_count / (max_count or 100.0), message or "NO MESSAGE")
 
+def print_success():
+    print """
+     #####  #     #  #####   #####  #######  #####   #####     ###
+    #     # #     # #     # #     # #       #     # #     #    ###
+    #       #     # #       #       #       #       #          ###
+     #####  #     # #       #       #####    #####   #####      #
+          # #     # #       #       #             #       #
+    #     # #     # #     # #     # #       #     # #     #    ###
+     #####   #####   #####   #####  #######  #####   #####     ###
+
+    """
+
 def production_sync(repo, msg = ""):
     # stage results first, then commit, then reset all other files
     repo.index.add(["2.SushiID/label_dont_touch/*.result.csv"])
     if repo.is_dirty(working_tree=False):
         repo.index.commit("Sync production results. " + msg)
+
     repo.head.reset(index=True, working_tree=True)
     
     # try to push, if rejected, try tp pull first, then retry 
@@ -41,7 +54,7 @@ def production_sync(repo, msg = ""):
         print "Push or pull failed with MAX_RETRY: check network first."
         return
     
-    print "Sync successful."
+    print_success()
 
 def main():
     if (len(sys.argv) < 2):
