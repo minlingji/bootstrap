@@ -5,6 +5,7 @@ from git import Repo, RemoteProgress
 import os, sys
 
 MAX_RETRY = 3
+RESULT_FILES = "2.SushiID/label_dont_touch/*.result.csv"
 
 class MyProgressPrinter(RemoteProgress):
     def update(self, op_code, cur_count, max_count=None, message=''):
@@ -24,7 +25,7 @@ def print_success():
 
 def production_sync(repo, msg = ""):
     # stage results first, then commit, then reset all other files
-    repo.index.add(["2.SushiID/label_dont_touch/*.result.csv"])
+    repo.index.add([RESULT_FILES])
     if repo.is_dirty(working_tree=False):
         repo.index.commit("Sync production results. " + msg)
 
@@ -89,7 +90,7 @@ def main():
     
     if sys.argv[1] == 'sync':
         try:
-            repo = Repo(os.path.dirname(os.path.realpath(__file__)) + "\\..\\")
+            repo = Repo(os.path.dirname(os.path.realpath(__file__)))
         except:
             print "Current dir is not a git repo."
             return
