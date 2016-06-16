@@ -79,6 +79,7 @@ def production_init(repo_url, local_path):
     h = repo.create_head(branch_name, origin.refs[b])
     h.set_tracking_branch(origin.refs[b])
     repo.head.reference = h
+    repo.head.reset(index=True, working_tree=True)
 
 def main():
     if (len(sys.argv) < 2):
