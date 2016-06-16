@@ -291,7 +291,7 @@ def main():
 
     check_input_availability(sys.argv[2])
     output_file = sys.argv[2].split('.')
-    output_file = output_file[0] + '.' + output_file[1] + '.' + output_file[2] + '.result.' + output_file[4]
+    output_file = '.'.join(output_file[0:-1]) + '.result.' + output_file[-1]
 
     while (1):
         input_content = get_infos(os.path.join(FILE_PATH, get_dirname()) + '/', sys.argv[2], output_file)
