@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-from git import Repo
+from git import Repo, RemoteProgress
 import os, sys
 
 MAX_RETRY = 3
