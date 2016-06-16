@@ -1,0 +1,1 @@
+bartend.exe /F=label_dont_touch\30x40-sushi.btw /MIN
