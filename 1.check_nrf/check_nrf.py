@@ -4,134 +4,15 @@
 import sys, serial, struct
 import time
 import os
+from pybootloader import Bootloader_v2
 
-def recv_cmd(s, timeout = 0):
-    rr = {}
-    while 1:
-        if timeout and time.time() > timeout:
-            rr['type'] = 'TO'
-            break
-        r = s.readline()
-        if not len(r): continue
-        if r.startswith('(BB)'):
-            rr['type'] = 'B'
-            rr['raw'] = r[4:].strip()
-        elif r.startswith('(EE)'):
-            rr['type'] = 'E'
-            rr['raw'] = r[4:].strip()
-        elif r.startswith('(DD)'):
-            rr['type'] = 'D'
-            rr['raw'] = r[4:].strip()
-            i = 0
-            for d in rr['raw'].split(' '):
-                rr[i] = d.decode("hex")
-                i += 1
-            rr['len'] = i
-        elif r.startswith('(QQ)'):
-            rr['type'] = 'Q'
-            rr['raw'] = r[4:].strip()
-        else:
-            continue
-        break
-    return rr
+BLVER = 2
+SIGNAL_TEST_ENABLE = 1
+SIGNAL_LOST_THRESHOLD_TOTAL = 15
+SIGNAL_LOST_THRESHOLD_SEPARATE = 10
 
-def connect(ser, timeout = 120, maxnode = 127):
-    print "Waiting for %d secs for %d nodes max." % (timeout, maxnode)
-
-    ser.write("c" + chr(maxnode))
-    l = recv_cmd(ser)
-    if l['type'] != 'B':
-        print "ERROR, cannot start connection."
-        return -1
-
-    print "Connecting...",
-
-    rr = []
-    if timeout:
-        timeout = timeout + time.time()
-    while 1:
-        l = recv_cmd(ser, timeout)
-        if l['type'] == 'D':
-            rr.append(l[0])
-            print (l['raw'] + ";"),
-        elif l['type'] == 'Q':
-            print "Done."
-            break
-        elif l['type'] == 'E':
-            print "Error:" + l['raw']
-            break
-        elif l['type'] == 'TO':
-            print "Timeout, done."
-            ser.write("q")
-            l = recv_cmd(ser)
-            break
-
-    return rr
-
-def stdcmd(ser, cmd, addrlist, force_unicast = 0):
-    if isinstance(addrlist, basestring):
-        addrlist = [addrlist]
-    alist = addrlist[:]
-    rr = {}
-
-    #print ("Command %s(%d)..." %(cmd[0], len(addrlist))),
-    node_cnt = len(alist)
-    b = 0
-    while len(alist) >= 3 and b <= 2 and not force_unicast:
-        ser.write(cmd)
-        ser.write('B' + chr(node_cnt) + '000')
-        l = recv_cmd(ser)
-        if l['type'] != 'B':
-            print "ERROR, cannot start command."
-            return rr
-        while 1:
-            l = recv_cmd(ser)
-            if l['type'] == 'D':
-                if l[0] in alist:
-                    alist.remove(l[0])
-                rr[l[0]] = l[1]
-                #print (l['raw'] + ";"),
-            elif l['type'] == 'Q':
-                break
-            elif l['type'] == 'E':
-                print "Error:" + l['raw']
-                return rr
-        b = b + 1
-
-    #print "unicast...",
-
-    r = 0
-    while len(alist):
-        a = alist[0]
-        ser.write(cmd)
-        ser.write("-" + a[::-1])
-        l = recv_cmd(ser)
-        if l['type'] != 'B':
-            print "ERROR, cannot start command."
-            print l['raw']
-            return rr
-        r = r + 1
-        l = recv_cmd(ser, time.time() + 0.5)
-        if l['type'] == 'D':
-            alist.remove(a)
-            rr[a] = l[1]
-            r = 0
-            #print (l['raw'] + "; "),
-        elif l['type'] == 'Q' or l['type'] == 'TO':
-            if r > 20:
-                print "Give-up: " + a.encode("hex")
-                alist.remove(a)
-                r = 0
-        elif l['type'] == 'E':
-            print "Error:" + l['raw']
-            return rr
-
-    # strip if single target
-    if len(addrlist) == 1 and len(rr) == 1:
-        if addrlist[0] in rr:
-            rr = rr[addrlist[0]]
-    #print "Done."
-    return rr
+BATTERY_TEST_ENABLE = 1
+BATTERY_THRESHOLD = 3.0
 
 def print_seccuss():
     print """
@@ -148,81 +29,109 @@ def print_seccuss():
 def print_low_power():
     print "电池电量低!!!不合格!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!".decode("utf8")
 
+def press_enter_continue():
+    print "请按回车键继续...".decode("utf8")
+    raw_input()
+
 def main():
     if (len(sys.argv) < 2):
-        print "download.py com1 [addr]"
+        print "check_nrf.py comN [addr]"
         return
 
     while(1):
-        s = serial.Serial(sys.argv[1], 256000, timeout=0.1)
-        s.write("q")
-        l = recv_cmd(s)
-        if l['type'] != 'Q':
-            print "ERROR, Please reset the adapter hardware."
+        if BLVER == 1:
+            b = Bootloader_v1.Bootloader()
+        elif BLVER == 2:
+            b = Bootloader_v2.Bootloader()
+        else:
+            raise Exception("Bootloader Version Unspecified. ")
+        r = b.open(sys.argv[1])
+        if r['r'] < 0:
+            print ("Adapter连接失败: %s" % r['err']).decode("utf8")
             return
-        s.write("2")
-        l = recv_cmd(s)
-        if l['type'] != 'Q':
-            print "Adapter version wrong! "
+   
+        try:
+            r = b.connect(max_nodes = 1)
+            if r['r'] < 0:
+                print "无设备连接，退出".decode("utf8")
+                return
+        except KeyboardInterrupt:
+            print "Exit"
             return
-        nodes = connect(s, timeout = 120, maxnode=1)
+        
+        # get bootloader version
+        r = b.get_hwinfo()
+        if r['r'] < 0:
+            print "Get HW Info Error: %s" % r['err']
+            b.run_app()
+            b.close()
+            press_enter_continue()
+            continue
+            
+        print "Bootloader version: %d" % r['blver']
+        print "Chip type: %d" % r['chip']
+        print "HW version: %s" % r['hwver']
+        print "Battery: %.2fV" % r['battery']
+
+        if BATTERY_TEST_ENABLE and r['battery'] < BATTERY_THRESHOLD :
+            print_low_power()
+            b.run_app()
+            b.close()
+            press_enter_continue()
+            continue
+        
+        # get address version
+        r = b.get_addrinfo()
+        if r['r'] < 0:
+            print "Get Addr Info Error: %s" % r['err']
+            b.run_app()
+            b.close()
+            press_enter_continue()
+            continue
+            
+        print "Addr: %s" % r['addr']
+        print "FW version: %s" % r['fwver']
+        if 'calinfo' in r:
+            print "Calibration info: %s" % r['calinfo']
+        
+        if SIGNAL_TEST_ENABLE and BLVER == 2:
+            signal_good = 1
+            for c in range(0, 128, 32):
+                # signal test
+                r = b.signal_test(c)
+                if r['r'] == 0:
+                    for a in r['lost']:
+                        sig = r['lost'][a]
+                        break
+                    if sig['total']/4.5 > SIGNAL_LOST_THRESHOLD_TOTAL or sig[0]/1.5 > SIGNAL_LOST_THRESHOLD_SEPARATE or sig[1]/1.5 > SIGNAL_LOST_THRESHOLD_SEPARATE or sig[2]/1.5 > SIGNAL_LOST_THRESHOLD_SEPARATE:
+                        print "Channel %d: T/ %s%% A/ %s%% B/ %s%% C/ %s%%" % (c, format(sig['total']/4.5, '.2f'), format(sig[0]/1.5, '.2f'), format(sig[1]/1.5, '.2f'), format(sig[2]/1.5, '.2f'))
+                        print "设备通信质量太差了不合格".decode("utf8")
+                        signal_good = 0
+                        break
+                        #print "%d %s %s %s %s" % (c, format(r['lost'][a]['total']/4.5, '.2f'), format(r['lost'][a][0]/1.5, '.2f'), format(r['lost'][a][1]/1.5, '.2f'), format(r['lost'][a][2]/1.5, '.2f'))
+                else:
+                    print "测试通信质量过程出错，请重新上电设备重试".decode("utf8")
+                    signal_good = 0
+                    break
+            if not signal_good:
+                b.run_app()
+                b.close()
+                press_enter_continue()
+                continue
+
+        # start app
+        r = b.run_app()
+        if r['r'] < 0:
+            print "Run App Error: %s" % r['err']
+            b.close()
+            press_enter_continue()
+            continue
+
+        b.close()
+        
+        print_seccuss()
+        time.sleep(1)
         os.system('cls')
-        print "%d nodes connected. " % len(nodes)
-        if len(nodes) == 0:
-            print "Abort."
-
-        vs = stdcmd(s, "v", nodes)
-        if len(vs) == 0:
-            print "Version error, try again."
-        if not len(vs) == 0:
-            ver = ord(vs[0])
-            chip = ord(vs[1])
-            chips = ["LOW-PWR", "STM32MD", "RESV", "STM32CONN", "STM8MD"]
-            bat = (ord(vs[3])*256+ord(vs[4]))/4096.0 * 3.6
-            print "Bootloader version: %d" % ver
-            print "Chip type: %d (%s)" % (chip, chips[chip])
-            print "电池电量 = %.2fV".decode("utf8") % bat
-
-            r = stdcmd(s, "d", nodes)
-            if not len(r):
-                print "Fetch device config error"
-            r = stdcmd(s, "f1", nodes)
-            if len(r) and ord(r[0]) == 1:
-                print "Current Address: " + r[2:6].encode("HEX")
-            else:
-                print "Get Address error."
-            r = stdcmd(s, "f3", nodes)
-            if len(r) and ord(r[0]) == 3:
-                print "Hardware version: " + r[2:4].encode("HEX")
-            else:
-                print "Get Hardware version error."
-            r = stdcmd(s, "f4", nodes)
-            if len(r) and ord(r[0]) == 4:
-                print "Firmware version: " + r[2:6].encode("HEX")
-            else:
-                print "Get Firmware version error."
-
-            # start app
-            i = 1
-            while(i==1):
-                r = stdcmd(s, "g", nodes)
-                if not r == {}:
-                    print "Run App OK"
-                    break
-                if  r == {}:
-                    i = 0
-                    print "Run App error, reset and try again"
-                    break
-                i -= 1
-
-            time.sleep(0.5)
-
-            if not r == {} and bat > 3.0 :
-                print_seccuss()
-            if not bat > 3.0 :
-                print_low_power()
-
-        s.close()
 
 if __name__ == "__main__":
     main()
