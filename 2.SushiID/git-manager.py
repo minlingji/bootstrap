@@ -15,7 +15,8 @@ def production_sync(repo, msg = ""):
     repo.head.reset(index=True, working_tree=True)
     
     origin = repo.remotes['origin']
-    origin.push(progress=MyProgressPrinter())
+    for push_info in origin.push(repo.head.reference, progress=MyProgressPrinter()):
+        print "Pushed"
 
 def main():
     if (len(sys.argv) < 2):
