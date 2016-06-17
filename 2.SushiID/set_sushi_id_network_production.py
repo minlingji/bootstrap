@@ -213,6 +213,12 @@ def setid(comport, input_content, logout_path, logout_file):
         print "FW version: %s" % r['fwver']
         print "Calibration Info: %s" % r['calinfo']
         cali_info = r['calinfo']
+
+        if r['addr'].lower() != "ffffffff" and "override" not in sys.argv:
+            print "设备地址已存在，请使用强制刷入新地址脚本".decode("utf8")
+            log_out(logout_path, logout_file, unumber, 6)
+            b.run_app()
+            continue
         
         # check firmware
         if r['fwver'].lower()[4:8] == "ffff" and "override" not in sys.argv:
