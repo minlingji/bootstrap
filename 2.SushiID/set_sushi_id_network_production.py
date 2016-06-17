@@ -8,9 +8,24 @@ from datetime import datetime
 from pybootloader import *
 
 BLVER = 2
-FILE_PATH = 'E:/HuanTengDB/'
+FILE_PATH = 'label_dont_touch/'
 HWVER = '0801'
 
+def check_source_file():
+    source_file_counter = 0
+    source_db_name = ''
+    for root,dirnames,filenames in os.walk(os.path.join(os.getcwd(), FILE_PATH)):
+        for filename in fnmatch.filter(filenames, '*.csv'):
+            file_name_content = filename.split('.')
+            if file_name_content[3].isdigit():
+                source_db_name = filename
+                source_file_counter = source_file_counter + 1
+
+    if source_file_counter != 1:
+        print "源文件有问题！！！请于幻腾工作人员联系！！！！".decode("utf8")
+        return 0
+
+    return source_db_name
 
 def get_dirname():
     current_dir = os.getcwd()
@@ -289,13 +304,13 @@ def main():
         print "%s com3" % sys.argv[0]
         return
 
-    check_input_availability(sys.argv[2])
-    output_file = sys.argv[2].split('.')
+    input_file = check_source_file()
+    output_file = input_file.split('.')
     output_file = '.'.join(output_file[0:-1]) + '.result.' + output_file[-1]
 
     while (1):
-        input_content = get_infos(os.path.join(FILE_PATH, get_dirname()) + '/', sys.argv[2], output_file)
-        r = setid(sys.argv[1], input_content, os.path.join(FILE_PATH, get_dirname()) + '/', output_file)
+        input_content = get_infos(FILE_PATH, input_file, output_file)
+        r = setid(sys.argv[1], input_content, os.path.join(FILE_PATH, output_file)
         if r == 0:
             time.sleep(2)
         else:
