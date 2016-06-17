@@ -324,7 +324,7 @@ def main():
         else:
             press_enter_continue()
 
-        if 'override' in sys.argv or r == -1:
+        if 'override' in sys.argv:
             break                
 if __name__ == "__main__":
     main()
