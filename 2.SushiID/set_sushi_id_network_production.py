@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-import sys, serial, struct, json, os
+import sys, serial, struct, json, os, fnmatch
 # from Crypto.Cipher import AES
 import time
 from datetime import datetime
@@ -17,6 +17,8 @@ def check_source_file():
     for root,dirnames,filenames in os.walk(os.path.join(os.getcwd(), FILE_PATH)):
         for filename in fnmatch.filter(filenames, '*.csv'):
             file_name_content = filename.split('.')
+            if(len(file_name_content) != 5):
+                continue
             if file_name_content[3].isdigit():
                 source_db_name = filename
                 source_file_counter = source_file_counter + 1
@@ -306,11 +308,12 @@ def main():
 
     input_file = check_source_file()
     output_file = input_file.split('.')
+    print "生产批次号：".decode("utf8") + output_file[0]
     output_file = '.'.join(output_file[0:-1]) + '.result.' + output_file[-1]
 
     while (1):
         input_content = get_infos(FILE_PATH, input_file, output_file)
-        r = setid(sys.argv[1], input_content, os.path.join(FILE_PATH, output_file)
+        r = setid(sys.argv[1], input_content, FILE_PATH, output_file)
         if r == 0:
             time.sleep(2)
         else:
