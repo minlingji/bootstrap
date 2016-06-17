@@ -11,6 +11,10 @@ BLVER = 2
 FILE_PATH = 'label_dont_touch/'
 HWVER = '0801'
 
+def press_enter_continue():
+    print "请按回车键继续...".decode("utf8")
+    raw_input()
+    
 def check_source_file():
     source_file_counter = 0
     source_db_name = ''
@@ -195,7 +199,7 @@ def setid(comport, input_content, logout_path, logout_file):
                 print "运行设备失败，请重新上电设备重试，并使用强制刷入新地址脚本".decode("utf8")
                 log_out(logout_path, logout_file, unumber, 15)
                 print "Error: %s" % r['err']
-                return 0
+                return -1
             continue 
 
         # get address version
@@ -224,26 +228,26 @@ def setid(comport, input_content, logout_path, logout_file):
         if r['r'] < 0:
             print "解写保护失败，请重新上电设备重试，并使用强制刷入新地址脚本".decode("utf8")
             log_out(logout_path, logout_file, unumber, 10)
-            return 0
+            return -1
         # now wp disabled
 
         r = b.set_info(addr = addr, prikey = pkey)
         if r['r'] < 0:
             print "刷入地址失败，请重新上电设备重试，并使用强制刷入新地址脚本".decode("utf8")
             log_out(logout_path, logout_file, unumber, 11)
-            return 0
+            return -1
         if BLVER == 1:
             print "V1 bootloader. Set HWVER to %s" % HWVER
             r = b.set_hwver(hwver = HWVER.decode("hex"))
             if r['r'] < 0:
                 print "Error: %s" % r['err']
-                return 0
+                return -1
 
         r = b.get_addrinfo()
         if r['r'] < 0:
             print "获取设备地址失败，请重新上电设备重试，并使用强制刷入新地址脚本".decode("utf8")
             log_out(logout_path, logout_file, unumber, 12)
-            return 0
+            return -1
         print "Addr: %s" % r['addr']
         print "FW version: %s" % r['fwver']
 
@@ -270,7 +274,7 @@ def setid(comport, input_content, logout_path, logout_file):
             print "运行设备失败，请重新上电设备重试，并使用强制刷入新地址脚本".decode("utf8")
             log_out(logout_path, logout_file, unumber, 15)
             print "Error: %s" % r['err']
-            return 0
+            return -1
 
         b.close()
 
@@ -315,10 +319,11 @@ def main():
         input_content = get_infos(FILE_PATH, input_file, output_file)
         r = setid(sys.argv[1], input_content, FILE_PATH, output_file)
         if r == 0:
-            time.sleep(2)
+            time.sleep(1)
+            os.system('cls')
         else:
-            k = raw_input("Error. Press enter to continue > ")
-        #os.system('cls')
+            press_enter_continue()
+
         if 'override' in sys.argv or r == -1:
             break                
 if __name__ == "__main__":
