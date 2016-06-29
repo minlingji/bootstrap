@@ -25,7 +25,10 @@ def print_success():
 
 def production_sync(repo, msg = ""):
     # stage results first, then commit, then reset all other files
-    repo.index.add([RESULT_FILES])
+    try:
+        repo.git.add([RESULT_FILES])
+    except:
+        print "Git Add Error. We will continue, but please contact Huan Teng."
     if repo.is_dirty(working_tree=False):
         repo.index.commit("Sync production results. " + msg)
 
